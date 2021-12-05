@@ -9,10 +9,12 @@ static INPUT_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/inputs");
 pub enum InputFileError {
     #[error("IO Error")]
     IoError(#[from] std::io::Error),
+    #[error("General Error: {0}")]
+    GeneralError(String),
     #[error("Could not parse int")]
     ParseIntError(#[from] core::num::ParseIntError),
-    #[error("Could not find day")]
-    CouldNotFindDay,
+    #[error("Could not find day {0}")]
+    CouldNotFindDay(usize),
 }
 
 pub struct InputFile {
@@ -40,6 +42,6 @@ pub fn load_input<O : TryFrom<InputFile>>(day : usize) -> Result<O, InputFileErr
                 data: buffer,
             }.try_into()?)
         },
-        None => Err(InputFileError::CouldNotFindDay)
+        None => Err(InputFileError::CouldNotFindDay(day))
     }
 }
