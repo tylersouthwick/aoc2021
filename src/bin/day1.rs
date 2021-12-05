@@ -1,6 +1,11 @@
+use aoc2021::input::load_input;
+use anyhow::Result;
 
-fn main() {
-    println!("Hello, day1!");
+fn main() -> Result<()> {
+    let data : Vec<i64> = load_input(1)?;
+    let depth_changes = find_depth_increases(data);
+    println!("depth changes: {}", depth_changes);
+    Ok(())
 }
 
 #[derive(Debug, PartialEq)]
@@ -31,8 +36,6 @@ fn calculate_depth_changes(measurements : Vec<i64>) -> Vec<DepthChange> {
 
         previous_measurement = Some(*measurement);
     }
-
-    println!("{:?}", depth_changes);
 
     depth_changes
 }
