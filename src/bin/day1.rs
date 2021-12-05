@@ -3,8 +3,8 @@ use anyhow::Result;
 
 fn main() -> Result<()> {
     let data : Vec<i64> = load_input(1)?;
-    let depth_changes = find_depth_increases(data);
-    println!("depth changes: {}", depth_changes);
+    let depth_changes_part1 = find_depth_increases(data, 1);
+    println!("depth changes part1: {}", depth_changes_part1);
     Ok(())
 }
 
@@ -16,11 +16,31 @@ enum DepthChange {
     Decreased,
 }
 
-fn calculate_depth_changes(measurements : Vec<i64>) -> Vec<DepthChange> {
+fn create_windows(measurements : Vec<i64>, window_size : usize) -> Vec<i64> {
+    let mut windows = vec![];
+    let mut current_window = vec![];
+
+    for measurement in measurements.iter() {
+        current_window.push(measurement);
+        if current_window.len() == window_size {
+            let mut sum = 0;
+            for current_window_item in current_window.iter() {
+                sum = sum + **current_window_item;
+            }
+            windows.push(sum);
+            current_window = vec![];
+        }
+    }
+
+    windows
+}
+
+fn calculate_depth_changes(measurements : Vec<i64>, window_size : usize) -> Vec<DepthChange> {
     let mut previous_measurement : Option<i64> = None;
     let mut depth_changes = vec![];
 
-    for measurement in measurements.iter() {
+    let windows = create_windows(measurements, window_size);
+    for measurement in windows.iter() {
         depth_changes.push(match previous_measurement {
             Some(previous) => {
                 if measurement == &previous {
@@ -40,8 +60,8 @@ fn calculate_depth_changes(measurements : Vec<i64>) -> Vec<DepthChange> {
     depth_changes
 }
 
-fn find_depth_increases(measurements : Vec<i64>) -> i64 {
-    let depth_changes = calculate_depth_changes(measurements);
+fn find_depth_increases(measurements : Vec<i64>, window_size : usize) -> i64 {
+    let depth_changes = calculate_depth_changes(measurements, window_size);
 
     let mut increase_count = 0;
 
@@ -55,7 +75,7 @@ fn find_depth_increases(measurements : Vec<i64>) -> i64 {
 }
 
 #[test]
-fn test_depth_increases() {
+fn test_depth_increases_part1() {
     let depth_increase_count = find_depth_increases(vec![
         199,
         200,
@@ -67,7 +87,7 @@ fn test_depth_increases() {
         269,
         260,
         263,
-    ]);
+    ], 1);
 
     assert_eq!(depth_increase_count, 7);
 }
