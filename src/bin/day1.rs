@@ -3,8 +3,11 @@ use anyhow::Result;
 
 fn main() -> Result<()> {
     let data : Vec<i64> = load_input(1)?;
-    let depth_changes_part1 = find_depth_increases(data, 1);
+    let depth_changes_part1 = find_depth_increases(&data, 1);
     println!("depth changes part1: {}", depth_changes_part1);
+
+    let depth_changes_part2 = find_depth_increases(&data, 3);
+    println!("depth changes part2: {}", depth_changes_part2);
     Ok(())
 }
 
@@ -16,26 +19,22 @@ enum DepthChange {
     Decreased,
 }
 
-fn create_windows(measurements : Vec<i64>, window_size : usize) -> Vec<i64> {
+fn create_windows(measurements : &Vec<i64>, window_size : usize) -> Vec<i64> {
     let mut windows = vec![];
-    let mut current_window = vec![];
 
-    for measurement in measurements.iter() {
-        current_window.push(measurement);
-        if current_window.len() == window_size {
-            let mut sum = 0;
-            for current_window_item in current_window.iter() {
-                sum = sum + **current_window_item;
-            }
-            windows.push(sum);
-            current_window = vec![];
+    for i in 0..(measurements.len() - window_size + 1) {
+        let sliding_window = &measurements.as_slice()[i..i+window_size];
+        let mut sum = 0;
+        for window in sliding_window.iter() {
+            sum = sum + window;
         }
+        windows.push(sum);
     }
 
     windows
 }
 
-fn calculate_depth_changes(measurements : Vec<i64>, window_size : usize) -> Vec<DepthChange> {
+fn calculate_depth_changes(measurements : &Vec<i64>, window_size : usize) -> Vec<DepthChange> {
     let mut previous_measurement : Option<i64> = None;
     let mut depth_changes = vec![];
 
@@ -60,7 +59,7 @@ fn calculate_depth_changes(measurements : Vec<i64>, window_size : usize) -> Vec<
     depth_changes
 }
 
-fn find_depth_increases(measurements : Vec<i64>, window_size : usize) -> i64 {
+fn find_depth_increases(measurements : &Vec<i64>, window_size : usize) -> i64 {
     let depth_changes = calculate_depth_changes(measurements, window_size);
 
     let mut increase_count = 0;
@@ -76,7 +75,7 @@ fn find_depth_increases(measurements : Vec<i64>, window_size : usize) -> i64 {
 
 #[test]
 fn test_depth_increases_part1() {
-    let depth_increase_count = find_depth_increases(vec![
+    let depth_increase_count = find_depth_increases(&vec![
         199,
         200,
         208,
@@ -90,4 +89,22 @@ fn test_depth_increases_part1() {
     ], 1);
 
     assert_eq!(depth_increase_count, 7);
+}
+
+#[test]
+fn test_depth_increases_part2() {
+    let depth_increase_count = find_depth_increases(&vec![
+        199,
+        200,
+        208,
+        210,
+        200,
+        207,
+        240,
+        269,
+        260,
+        263,
+    ], 3);
+
+    assert_eq!(depth_increase_count, 5);
 }
