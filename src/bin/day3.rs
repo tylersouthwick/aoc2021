@@ -112,9 +112,98 @@ impl<A : Eq + Hash + core::fmt::Debug + Clone> Counter<A> {
     }
 }
 
+struct OxygenGeneratingRating {
+    readings : Vec<DiagnosticReading>,
+}
+
+impl OxygenGeneratingRating {
+    fn new(report : &DiagnosticReport) -> Self {
+        OxygenGeneratingRating {
+            readings: report.readings.clone(),
+        }
+    }
+
+    fn find_max_bit(&mut self, pos : usize) -> anyhow::Result<BinaryDigit> {
+        let mut counter = Counter::default();
+        for reading in self.readings.iter() {
+            counter.push(reading.bits[pos].clone());
+        }
+        match counter.max() {
+            Some(max) => Ok(max),
+            None => Err(anyhow::anyhow!("could not find a max bit")),
+        }
+    }
+
+    fn calculate(&mut self) -> anyhow::Result<usize> {
+        let mut binary_number = BinaryNumber::new();
+        for i in 0..self.readings[0].bits.len() {
+            let digit = self.find_max_bit(i)?;
+            //println!("digit: {:?}", digit);
+            binary_number.push(digit.clone());
+            //println!("current readings: {}", self.readings.len());
+            self.readings = self.readings.iter()
+                .filter(|reading| reading.bits[i] == digit)
+                .map(Clone::clone)
+                .collect();
+            //println!("after filter readings: {}", self.readings.len());
+        }
+        Ok(binary_number.into())
+    }
+}
+
+struct CO2ScrubberRating {
+    readings : Vec<DiagnosticReading>,
+}
+
+impl CO2ScrubberRating {
+    fn new(report : &DiagnosticReport) -> Self {
+        CO2ScrubberRating {
+            readings: report.readings.clone(),
+        }
+    }
+
+    fn find_min_bit(&mut self, pos : usize) -> anyhow::Result<BinaryDigit> {
+        let mut counter = Counter::default();
+        for reading in self.readings.iter() {
+            counter.push(reading.bits[pos].clone());
+        }
+        match counter.min() {
+            Some(min) => Ok(min),
+            None => Err(anyhow::anyhow!("could not find a min bit")),
+        }
+    }
+
+    fn calculate(&mut self) -> anyhow::Result<usize> {
+        let mut binary_number = BinaryNumber::new();
+        for i in 0..self.readings[0].bits.len() {
+            let digit = self.find_min_bit(i)?;
+            binary_number.push(digit.clone());
+            self.readings = self.readings.iter()
+                .filter(|reading| reading.bits[i] == digit)
+                .map(Clone::clone)
+                .collect();
+        }
+        Ok(binary_number.into())
+    }
+}
+
 impl DiagnosticReport {
     fn result(&self) -> anyhow::Result<usize> {
         Ok(self.gamma_rate()? * self.epsilon_rate()?)
+    }
+
+    fn life_support_rating(&self) -> anyhow::Result<usize> {
+        Ok(self.oxygen_generator_rating()? * self.co2_scrubber_rating()?)
+    }
+
+    fn oxygen_generator_rating(&self) -> anyhow::Result<usize> {
+        let mut generator = OxygenGeneratingRating::new(self);
+        generator.calculate()
+    }
+
+    fn co2_scrubber_rating(&self) -> anyhow::Result<usize> {
+        let mut generator = CO2ScrubberRating::new(self);
+        generator.calculate()
     }
 
     fn gamma_rate(&self) -> anyhow::Result<usize> {
@@ -170,7 +259,7 @@ impl From<Vec<DiagnosticReading>> for DiagnosticReport {
     }
 }
 
-#[derive(Default, Debug, PartialEq)]
+#[derive(Default, Debug, PartialEq, Clone)]
 struct DiagnosticReading {
     bits : Vec<BinaryDigit>
 }
@@ -241,6 +330,11 @@ mod test {
         assert_eq!(9, diagnostic_report.epsilon_rate()?);
         assert_eq!(22, diagnostic_report.gamma_rate()?);
         assert_eq!(198, diagnostic_report.result()?);
+
+        assert_eq!(23, diagnostic_report.oxygen_generator_rating()?);
+        assert_eq!(10, diagnostic_report.co2_scrubber_rating()?);
+        assert_eq!(230, diagnostic_report.life_support_rating()?);
+
         Ok(())
     }
 }
