@@ -18,7 +18,7 @@ pub enum InputFileError {
 }
 
 pub struct InputFile {
-    data : String
+    pub data : String
 }
 
 impl<O : FromStr> TryFrom<InputFile> for Vec<O> where InputFileError : From<<O as FromStr>::Err> {
