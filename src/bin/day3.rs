@@ -74,10 +74,7 @@ impl<A : Eq + Hash> Default for Counter<A> {
 
 impl<A : Eq + Hash + core::fmt::Debug + Clone> Counter<A> {
     fn push(&mut self, a : A) {
-        match self.map.get(&a) {
-            Some(value) => self.map.insert(a, value + 1),
-            None => self.map.insert(a, 1),
-        };
+        *self.map.entry(a).or_insert(0) += 1;
     }
 
     fn max(&self) -> Option<A> {
