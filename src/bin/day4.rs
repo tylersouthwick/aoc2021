@@ -4,15 +4,29 @@ fn main() -> anyhow::Result<()> {
     let mut game: Game = load_input(4)?;
 
     match game.simulate() {
-        SimulationResult::Winner {
+        SimulationResult::Winner(WinningBoard {
             last_number,
             board,
-        } => {
+        }) => {
             println!("part1: {}", last_number * board.sum_of_all_unmarked_numbers());
         },
         x => {
             println!("part1 failed {:?}", x);
             panic!("part1 failed")
+        },
+    }
+
+    let mut game: Game = load_input(4)?;
+    match game.find_last_board_to_win() {
+        SimulationResult::Winner(WinningBoard {
+            last_number,
+            board,
+        }) => {
+            println!("part2: {}", last_number * board.sum_of_all_unmarked_numbers());
+        },
+        x => {
+            println!("part2 failed {:?}", x);
+            panic!("part2 failed")
         },
     }
 
@@ -46,12 +60,28 @@ impl Game {
         for number in self.to_draw.clone().into_iter() {
             self.draw_number(number);
             match self.winner() {
-                Some(board) => return SimulationResult::Winner {
+                Some(board) => return SimulationResult::Winner(WinningBoard {
                     last_number: number,
                     board: board,
-                },
+                }),
                 None => {}
             }
+        }
+        SimulationResult::Draw
+    }
+
+    fn find_last_board_to_win(&mut self) -> SimulationResult {
+        for number in self.to_draw.clone().into_iter() {
+            self.draw_number(number);
+            if self.boards.len() == 1 && self.boards[0].is_winner() {
+                return SimulationResult::Winner(WinningBoard {
+                    last_number: number,
+                    board: self.boards[0],
+                });
+            }
+            self.boards = self.boards.clone().into_iter()
+                .filter(|x| !x.is_winner())
+                .collect();
         }
         SimulationResult::Draw
     }
@@ -91,10 +121,13 @@ fn map_array<A : Copy, B, F>(data : [[A; 5]; 5], f : F) -> [[B; 5]; 5] where F: 
 #[derive(Debug)]
 enum SimulationResult {
     Draw,
-    Winner {
-        last_number : i64,
-        board : Board,
-    }
+    Winner(WinningBoard),
+}
+
+#[derive(Debug)]
+struct WinningBoard {
+    last_number : i64,
+    board : Board,
 }
 
 impl Board {
@@ -337,12 +370,31 @@ mod test {
         let result = game.simulate();
 
         match result {
-            SimulationResult::Winner {
+            SimulationResult::Winner(WinningBoard {
                 board,
                 last_number,
-            } => {
+            }) => {
                 assert_eq!(board.sum_of_all_unmarked_numbers(), 188);
                 assert_eq!(last_number, 24);
+            },
+            _ => return Err(anyhow::anyhow!("invalid simulation result")),
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn find_last_board_to_win() -> anyhow::Result<()> {
+        let mut game : Game = load_sample(4)?;
+        let result = game.find_last_board_to_win();
+
+        match result {
+            SimulationResult::Winner(WinningBoard {
+                board,
+                last_number,
+            }) => {
+                assert_eq!(board.sum_of_all_unmarked_numbers(), 148);
+                assert_eq!(last_number, 13);
             },
             _ => return Err(anyhow::anyhow!("invalid simulation result")),
         }
@@ -356,10 +408,10 @@ mod test {
         let result = game.simulate();
 
         match result {
-            SimulationResult::Winner {
+            SimulationResult::Winner(WinningBoard {
                 board,
                 last_number,
-            } => {
+            }) => {
                 assert_eq!(board.sum_of_all_unmarked_numbers() * last_number, 72770);
             },
             _ => return Err(anyhow::anyhow!("invalid simulation result")),
