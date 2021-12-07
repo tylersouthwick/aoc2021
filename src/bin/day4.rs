@@ -1,8 +1,62 @@
+use aoc2021::input::{InputFileError, InputFile, load_input};
+
+fn main() -> anyhow::Result<()> {
+    let mut game: Game = load_input(4)?;
+
+    match game.simulate() {
+        SimulationResult::Winner {
+            last_number,
+            board,
+        } => {
+            println!("part1: {}", last_number * board.sum_of_all_unmarked_numbers());
+        },
+        x => {
+            println!("part1 failed {:?}", x);
+            panic!("part1 failed")
+        },
+    }
+
+
+    Ok(())
+}
+
 #[derive(Default)]
 struct Game {
     to_draw : Vec<i64>,
     boards : Vec<Board>,
 }
+
+impl Game {
+    fn draw_number(&mut self, num : i64) {
+        for board in self.boards.iter_mut() {
+            board.draw_number(num);
+        }
+    }
+
+    fn winner(&self) -> Option<Board> {
+        for board in self.boards.iter() {
+            if board.is_winner() {
+                return Some(*board)
+            }
+        }
+        None
+    }
+
+    fn simulate(&mut self) -> SimulationResult {
+        for number in self.to_draw.clone().into_iter() {
+            self.draw_number(number);
+            match self.winner() {
+                Some(board) => return SimulationResult::Winner {
+                    last_number: number,
+                    board: board,
+                },
+                None => {}
+            }
+        }
+        SimulationResult::Draw
+    }
+}
+
 
 #[derive(Debug, PartialEq, Copy, Clone, Default)]
 struct Cell {
@@ -19,7 +73,7 @@ impl Cell {
     }
 }
 
-#[derive(Debug, PartialEq, Default)]
+#[derive(Debug, PartialEq, Default, Copy, Clone)]
 struct Board {
     data : [[Cell; 5]; 5],
 }
@@ -34,12 +88,22 @@ fn map_array<A : Copy, B, F>(data : [[A; 5]; 5], f : F) -> [[B; 5]; 5] where F: 
     ]
 }
 
+#[derive(Debug)]
+enum SimulationResult {
+    Draw,
+    Winner {
+        last_number : i64,
+        board : Board,
+    }
+}
+
 impl Board {
     fn new(data : [[i64; 5]; 5]) -> Self {
         Board {
             data: map_array(data, Cell::new),
         }
     }
+
 
     fn is_marked(&self, x : usize, y : usize) -> bool {
         self.data[x][y].drawn
@@ -52,11 +116,23 @@ impl Board {
     fn draw_number(&mut self, num : i64) {
         for x in 0..5 {
             for y in 0..5 {
-                if self.data[x][y].number == num {
+                if self.number(x, y) == num {
                     self.data[x][y].drawn = true
                 }
             }
         }
+    }
+
+    fn sum_of_all_unmarked_numbers(&self) -> i64 {
+        let mut sum = 0;
+        for x in 0..5 {
+            for y in 0..5 {
+                if !self.data[x][y].drawn {
+                    sum += self.data[x][y].number
+                }
+            }
+        }
+        sum
     }
 
     fn is_winner_row(&self) -> bool {
@@ -94,8 +170,6 @@ impl Board {
     }
 
 }
-
-use aoc2021::input::{InputFile, InputFileError};
 
 #[derive(Debug)]
 enum ParsingState {
@@ -253,6 +327,43 @@ mod test {
                 [ 2,  0, 12,  3,  7],
             ]),
         ]);
+
+        Ok(())
+    }
+
+    #[test]
+    fn simulate() -> anyhow::Result<()> {
+        let mut game : Game = load_sample(4)?;
+        let result = game.simulate();
+
+        match result {
+            SimulationResult::Winner {
+                board,
+                last_number,
+            } => {
+                assert_eq!(board.sum_of_all_unmarked_numbers(), 188);
+                assert_eq!(last_number, 24);
+            },
+            _ => return Err(anyhow::anyhow!("invalid simulation result")),
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn part1() -> anyhow::Result<()> {
+        let mut game : Game = load_input(4)?;
+        let result = game.simulate();
+
+        match result {
+            SimulationResult::Winner {
+                board,
+                last_number,
+            } => {
+                assert_eq!(board.sum_of_all_unmarked_numbers() * last_number, 72770);
+            },
+            _ => return Err(anyhow::anyhow!("invalid simulation result")),
+        }
 
         Ok(())
     }
