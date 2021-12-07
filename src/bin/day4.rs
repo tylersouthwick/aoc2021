@@ -59,6 +59,40 @@ impl Board {
         }
     }
 
+    fn is_winner_row(&self) -> bool {
+        for x in 0..5 {
+            let mut count = 0;
+            for y in 0..5 {
+                if self.is_marked(x, y) {
+                    count += 1
+                }
+            }
+            if count == 5 {
+                return true
+            }
+        }
+        false
+    }
+
+    fn is_winner_column(&self) -> bool {
+        for y in 0..5 {
+            let mut count = 0;
+            for x in 0..5 {
+                if self.is_marked(x, y) {
+                    count += 1
+                }
+            }
+            if count == 5 {
+                return true
+            }
+        }
+        false
+    }
+
+    fn is_winner(&self) -> bool {
+        self.is_winner_column() || self.is_winner_row()
+    }
+
 }
 
 use aoc2021::input::{InputFile, InputFileError};
@@ -128,6 +162,8 @@ mod test {
                 assert_eq!(board.is_marked(x, y), false);
             }
         }
+
+        assert_eq!(board.is_winner(), false)
     }
 
     #[test]
@@ -146,6 +182,48 @@ mod test {
                 assert_eq!(board.is_marked(x, y), true);
             }
         }
+    }
+
+    #[test]
+    fn board_winner_row() {
+        let mut board = Board::new([
+            [22, 13, 17, 11,  0],
+            [ 8,  2, 23,  4, 24],
+            [21,  9, 14, 16,  7],
+            [ 6, 10,  3, 18,  5],
+            [ 1, 12, 20, 15, 19],
+        ]);
+        board.draw_number(6);
+        assert_eq!(board.is_winner(), false);
+        board.draw_number(10);
+        assert_eq!(board.is_winner(), false);
+        board.draw_number(3);
+        assert_eq!(board.is_winner(), false);
+        board.draw_number(18);
+        assert_eq!(board.is_winner(), false);
+        board.draw_number(5);
+        assert_eq!(board.is_winner(), true);
+    }
+
+    #[test]
+    fn board_winner_column() {
+        let mut board = Board::new([
+            [22, 13, 17, 11,  0],
+            [ 8,  2, 23,  4, 24],
+            [21,  9, 14, 16,  7],
+            [ 6, 10,  3, 18,  5],
+            [ 1, 12, 20, 15, 19],
+        ]);
+        board.draw_number(11);
+        assert_eq!(board.is_winner(), false);
+        board.draw_number(4);
+        assert_eq!(board.is_winner(), false);
+        board.draw_number(16);
+        assert_eq!(board.is_winner(), false);
+        board.draw_number(18);
+        assert_eq!(board.is_winner(), false);
+        board.draw_number(15);
+        assert_eq!(board.is_winner(), true);
     }
 
     #[test]
