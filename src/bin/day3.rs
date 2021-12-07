@@ -1,15 +1,18 @@
 use aoc2021::input::{InputFileError, InputFile, load_input};
 use std::str::FromStr;
+use itertools::Itertools;
 
 fn main() -> anyhow::Result<()> {
     let data: DiagnosticReport = load_input(3)?;
 
     println!("part1: {}", data.result()?);
 
+    println!("part2: {}", data.life_support_rating()?);
+
     Ok(())
 }
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 enum BinaryDigit {
     Zero,
     One,
@@ -45,7 +48,19 @@ impl From<BinaryNumber> for usize {
     fn from(binary_number : BinaryNumber) -> Self {
         let mut result = 0;
         for i in 0..binary_number.bits.len() {
-            let digit : usize = binary_number.bits[binary_number.bits.len() - i - 1].clone().into();
+            let digit : usize = binary_number.bits[binary_number.bits.len() - i - 1].into();
+            let offset = digit * 2_usize.pow(i.try_into().unwrap());
+            result += offset;
+        }
+        result
+    }
+}
+
+impl From<DiagnosticReading> for usize {
+    fn from(diagnostic_reading: DiagnosticReading) -> Self {
+        let mut result = 0;
+        for i in 0..diagnostic_reading.bits.len() {
+            let digit : usize = diagnostic_reading.bits[diagnostic_reading.bits.len() - i - 1].into();
             let offset = digit * 2_usize.pow(i.try_into().unwrap());
             result += offset;
         }
@@ -60,11 +75,11 @@ struct DiagnosticReport {
 
 use std::hash::Hash;
 
-struct Counter<A: Eq + Hash> {
-    map : std::collections::HashMap<A, usize>,
+struct Counter {
+    map : std::collections::HashMap<BinaryDigit, usize>,
 }
 
-impl<A : Eq + Hash> Default for Counter<A> {
+impl Default for Counter {
     fn default() -> Self {
         Counter {
             map: std::collections::HashMap::new(),
@@ -72,12 +87,12 @@ impl<A : Eq + Hash> Default for Counter<A> {
     }
 }
 
-impl<A : Eq + Hash + core::fmt::Debug + Clone> Counter<A> {
-    fn push(&mut self, a : A) {
+impl Counter {
+    fn push(&mut self, a : BinaryDigit) {
         *self.map.entry(a).or_insert(0) += 1;
     }
 
-    fn max(&self) -> Option<A> {
+    fn do_max(&self) -> Option<(&BinaryDigit, &usize)> {
         let mut max = None;
         for (key, value) in self.map.iter() {
             match max {
@@ -91,10 +106,14 @@ impl<A : Eq + Hash + core::fmt::Debug + Clone> Counter<A> {
                 }
             }
         }
-        max.map(|x| x.0.clone())
+        max
     }
 
-    fn min(&self) -> Option<A> {
+    fn max(&self) -> Option<BinaryDigit> {
+        self.do_max().map(|x| x.0.clone())
+    }
+
+    fn do_min(&self) -> Option<(&BinaryDigit, &usize)> {
         let mut min = None;
         for (key, value) in self.map.iter() {
             match min {
@@ -108,82 +127,66 @@ impl<A : Eq + Hash + core::fmt::Debug + Clone> Counter<A> {
                 }
             }
         }
-        min.map(|x| x.0.clone())
+        min
+    }
+
+    fn min(&self) -> Option<BinaryDigit> {
+        self.do_min().map(|x| x.0.clone())
+    }
+
+    fn is_equal(&self) -> bool {
+        let result : Vec<&usize> = self.map.values().unique().collect();
+        result.len() == 1
     }
 }
 
-struct OxygenGeneratingRating {
+struct RatingGenerator {
     readings : Vec<DiagnosticReading>,
+    heristic : Box<dyn Fn(&Counter) -> Option<BinaryDigit>>,
+    default_when_equal : BinaryDigit,
 }
 
-impl OxygenGeneratingRating {
-    fn new(report : &DiagnosticReport) -> Self {
-        OxygenGeneratingRating {
+impl RatingGenerator {
+    fn new(report : &DiagnosticReport, heristic : Box<dyn Fn(&Counter) -> Option<BinaryDigit>>, default_when_equal : BinaryDigit) -> Self {
+        RatingGenerator {
             readings: report.readings.clone(),
+            heristic,
+            default_when_equal,
         }
     }
 
-    fn find_max_bit(&mut self, pos : usize) -> anyhow::Result<BinaryDigit> {
+    fn find_bit(&mut self, pos : usize) -> anyhow::Result<BinaryDigit> {
         let mut counter = Counter::default();
         for reading in self.readings.iter() {
-            counter.push(reading.bits[pos].clone());
+            counter.push(reading.bits[pos]);
         }
-        match counter.max() {
-            Some(max) => Ok(max),
-            None => Err(anyhow::anyhow!("could not find a max bit")),
+        if counter.is_equal() {
+            Ok(self.default_when_equal)
+        } else {
+            match (self.heristic)(&counter) {
+                Some(value) => Ok(value),
+                None => Err(anyhow::anyhow!("could not find a value bit")),
+            }
         }
     }
 
     fn calculate(&mut self) -> anyhow::Result<usize> {
         let mut binary_number = BinaryNumber::new();
         for i in 0..self.readings[0].bits.len() {
-            let digit = self.find_max_bit(i)?;
+            let digit = self.find_bit(i)?;
             //println!("digit: {:?}", digit);
-            binary_number.push(digit.clone());
+            binary_number.push(digit);
             //println!("current readings: {}", self.readings.len());
             self.readings = self.readings.iter()
                 .filter(|reading| reading.bits[i] == digit)
                 .map(Clone::clone)
                 .collect();
-            //println!("after filter readings: {}", self.readings.len());
+            //println!("after filter readings: {} -> {:?}", self.readings.len(), binary_number);
+            if self.readings.len() == 1 {
+                return Ok(self.readings[0].clone().into())
+            }
         }
-        Ok(binary_number.into())
-    }
-}
-
-struct CO2ScrubberRating {
-    readings : Vec<DiagnosticReading>,
-}
-
-impl CO2ScrubberRating {
-    fn new(report : &DiagnosticReport) -> Self {
-        CO2ScrubberRating {
-            readings: report.readings.clone(),
-        }
-    }
-
-    fn find_min_bit(&mut self, pos : usize) -> anyhow::Result<BinaryDigit> {
-        let mut counter = Counter::default();
-        for reading in self.readings.iter() {
-            counter.push(reading.bits[pos].clone());
-        }
-        match counter.min() {
-            Some(min) => Ok(min),
-            None => Err(anyhow::anyhow!("could not find a min bit")),
-        }
-    }
-
-    fn calculate(&mut self) -> anyhow::Result<usize> {
-        let mut binary_number = BinaryNumber::new();
-        for i in 0..self.readings[0].bits.len() {
-            let digit = self.find_min_bit(i)?;
-            binary_number.push(digit.clone());
-            self.readings = self.readings.iter()
-                .filter(|reading| reading.bits[i] == digit)
-                .map(Clone::clone)
-                .collect();
-        }
-        Ok(binary_number.into())
+        Err(anyhow::anyhow!("unable to calculate"))
     }
 }
 
@@ -197,13 +200,19 @@ impl DiagnosticReport {
     }
 
     fn oxygen_generator_rating(&self) -> anyhow::Result<usize> {
-        let mut generator = OxygenGeneratingRating::new(self);
-        generator.calculate()
+        //println!("start oxygen");
+        let mut generator = RatingGenerator::new(self, Box::new(Counter::max), BinaryDigit::One);
+        let r = generator.calculate()?;
+        //println!("end oxygen");
+        Ok(r)
     }
 
     fn co2_scrubber_rating(&self) -> anyhow::Result<usize> {
-        let mut generator = CO2ScrubberRating::new(self);
-        generator.calculate()
+        //println!("start co2");
+        let mut generator = RatingGenerator::new(self, Box::new(Counter::min), BinaryDigit::Zero);
+        let r = generator.calculate()?;
+        //println!("end co2");
+        Ok(r)
     }
 
     fn gamma_rate(&self) -> anyhow::Result<usize> {
@@ -221,7 +230,7 @@ impl DiagnosticReport {
     fn most_common(&self, i : usize) -> anyhow::Result<BinaryDigit> {
         let mut counter = Counter::default();
         for reading in self.readings.iter() {
-            counter.push(reading.bits[i].clone());
+            counter.push(reading.bits[i]);
         }
 
         match counter.max() {
@@ -233,7 +242,7 @@ impl DiagnosticReport {
     fn least_common(&self, i : usize) -> anyhow::Result<BinaryDigit> {
         let mut counter = Counter::default();
         for reading in self.readings.iter() {
-            counter.push(reading.bits[i].clone());
+            counter.push(reading.bits[i]);
         }
 
         match counter.min() {
