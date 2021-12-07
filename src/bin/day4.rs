@@ -7,12 +7,14 @@ struct Game {
 #[derive(Debug, PartialEq, Copy, Clone, Default)]
 struct Cell {
     number : i64,
+    drawn : bool
 }
 
 impl Cell {
     fn new(number : i64) -> Self {
         Cell {
             number,
+            drawn: false,
         }
     }
 }
@@ -38,6 +40,25 @@ impl Board {
             data: map_array(data, Cell::new),
         }
     }
+
+    fn is_marked(&self, x : usize, y : usize) -> bool {
+        self.data[x][y].drawn
+    }
+
+    fn number(&self, x : usize, y : usize) -> i64{
+        self.data[x][y].number
+    }
+
+    fn draw_number(&mut self, num : i64) {
+        for x in 0..5 {
+            for y in 0..5 {
+                if self.data[x][y].number == num {
+                    self.data[x][y].drawn = true
+                }
+            }
+        }
+    }
+
 }
 
 use aoc2021::input::{InputFile, InputFileError};
@@ -101,6 +122,30 @@ mod test {
         let board = Board::new(data);
 
         assert_eq!(map_array(board.data, |c| c.number), data);
+
+        for x in 0..5 {
+            for y in 0..5 {
+                assert_eq!(board.is_marked(x, y), false);
+            }
+        }
+    }
+
+    #[test]
+    fn mark_board() {
+        let mut board = Board::new([
+            [22, 13, 17, 11,  0],
+            [ 8,  2, 23,  4, 24],
+            [21,  9, 14, 16,  7],
+            [ 6, 10,  3, 18,  5],
+            [ 1, 12, 20, 15, 19],
+        ]);
+        for x in 0..5 {
+            for y in 0..5 {
+                assert_eq!(board.is_marked(x, y), false);
+                board.draw_number(board.number(x, y));
+                assert_eq!(board.is_marked(x, y), true);
+            }
+        }
     }
 
     #[test]
