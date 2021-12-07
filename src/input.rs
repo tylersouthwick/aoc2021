@@ -14,27 +14,43 @@ pub enum InputFileError {
     #[error("Could not parse int")]
     ParseIntError(#[from] core::num::ParseIntError),
     #[error("Could not find day {0}")]
-    CouldNotFindDay(usize),
+    CouldNotFindDay(String),
 }
 
 pub struct InputFile {
     pub data : String
 }
 
+impl InputFile {
+    pub fn lines(&self) -> Vec<String> {
+        self.data.split("\n")
+            .map(str::trim)
+            .filter(|x| !x.is_empty())
+            .map(str::to_string)
+            .collect()
+    }
+}
+
 impl<O : FromStr> TryFrom<InputFile> for Vec<O> where InputFileError : From<<O as FromStr>::Err> {
     type Error = InputFileError;
 
     fn try_from(input_file : InputFile) -> Result<Self, Self::Error> {
-        Ok(input_file.data.split("\n")
-            .map(str::trim)
-            .filter(|x| !x.is_empty())
-            .map(O::from_str)
+        Ok(input_file.lines().into_iter()
+            .map(|s| O::from_str(s.as_str()))
             .collect::<Result<Vec<O>, O::Err>>()?)
     }
 }
 
+pub fn load_sample<O : TryFrom<InputFile>>(day : usize) -> Result<O, InputFileError> where InputFileError: From<<O as TryFrom<InputFile>>::Error> {
+    load_file(format!("day{}_sample", day))
+}
+
 pub fn load_input<O : TryFrom<InputFile>>(day : usize) -> Result<O, InputFileError> where InputFileError: From<<O as TryFrom<InputFile>>::Error> {
-    match INPUT_DIR.get_file(format!("day{}", day)) {
+    load_file(format!("day{}", day))
+}
+
+fn load_file<O : TryFrom<InputFile>>(file_name : String) -> Result<O, InputFileError> where InputFileError: From<<O as TryFrom<InputFile>>::Error> {
+    match INPUT_DIR.get_file(file_name.clone()) {
         Some(file) => {
             let mut buffer = String::new();
             file.contents().read_to_string(&mut buffer)?;
@@ -42,6 +58,6 @@ pub fn load_input<O : TryFrom<InputFile>>(day : usize) -> Result<O, InputFileErr
                 data: buffer,
             }.try_into()?)
         },
-        None => Err(InputFileError::CouldNotFindDay(day))
+        None => Err(InputFileError::CouldNotFindDay(file_name))
     }
 }
