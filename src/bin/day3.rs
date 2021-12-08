@@ -333,7 +333,7 @@ mod test {
                 "11001".to_string(),
                 "00010".to_string(),
                 "01010".to_string(),
-            ].join("\n"),
+            ],
         };
         let diagnostic_report : DiagnosticReport = input.try_into()?;
         assert_eq!(9, diagnostic_report.epsilon_rate()?);

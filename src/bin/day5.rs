@@ -365,7 +365,10 @@ mod day5_test {
     #[test]
     fn parse() -> anyhow::Result<()> {
         let field : VentField = InputFile {
-            data: "0,9 -> 5,9\n8,0 -> 0,8".to_string(),
+            data: vec![
+                "0,9 -> 5,9".to_string(),
+                "8,0 -> 0,8".to_string(),
+            ],
         }.try_into()?;
         assert_eq!(field, VentField {
             lines: vec![

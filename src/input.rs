@@ -18,16 +18,35 @@ pub enum InputFileError {
 }
 
 pub struct InputFile {
-    pub data : String
+    pub data : Vec<String>,
 }
 
 impl InputFile {
+
+    pub fn new(raw_data : String) -> Self {
+        InputFile {
+            data: raw_data.split("\n")
+                .map(str::trim)
+                .filter(|x| !x.is_empty())
+                .map(str::to_string)
+                .collect(),
+        }
+    }
+
     pub fn lines(&self) -> Vec<String> {
-        self.data.split("\n")
-            .map(str::trim)
-            .filter(|x| !x.is_empty())
-            .map(str::to_string)
-            .collect()
+        self.data.clone()
+    }
+
+    pub fn with_delimeter(&self, d : String) -> InputFile {
+        InputFile {
+            data: self.data.iter()
+                .flat_map(|x| x.split(&d)
+                    .map(str::trim)
+                    .filter(|x| !x.is_empty())
+                    .map(str::to_string)
+                    .collect::<Vec<String>>())
+                .collect(),
+        }
     }
 
 }
@@ -55,9 +74,7 @@ fn load_file<O : TryFrom<InputFile>>(file_name : String) -> Result<O, InputFileE
         Some(file) => {
             let mut buffer = String::new();
             file.contents().read_to_string(&mut buffer)?;
-            Ok(InputFile {
-                data: buffer,
-            }.try_into()?)
+            Ok(InputFile::new(buffer).try_into()?)
         },
         None => Err(InputFileError::CouldNotFindDay(file_name))
     }
