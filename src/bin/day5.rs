@@ -65,7 +65,7 @@ impl TryFrom<InputFile> for VentField {
     }
 }
 
-#[derive(Debug, PartialEq, Copy, Clone, PartialOrd, Ord, Eq)]
+#[derive(Debug, PartialEq, Copy, Clone, PartialOrd, Ord, Eq, Default, Hash)]
 struct Point {
     x : usize,
     y : usize,
@@ -101,10 +101,8 @@ impl LineSegment {
                 });
             }
         } else if include_diagnal {
-            println!("from={} to={}", self.from, self.to);
             let m = ((self.from.y as i64) - (self.to.y as i64)) / ((self.from.x as i64) - (self.to.x as i64));
             let b = (self.from.y as i64) - m * (self.from.x as i64);
-            println!("m={} b={}", m, b);
 
             for x in min(self.from.x, self.to.x)..=max(self.from.x, self.to.x) {
                 line.push(Point {
@@ -159,9 +157,57 @@ struct VentField {
     lines : Vec<LineSegment>
 }
 
+#[derive(Debug, Default, PartialEq, Clone)]
+struct SparseMatrix {
+    points: std::collections::HashMap<Point, i64>,
+}
+
+
+impl SparseMatrix {
+    fn new(rows: Vec<Vec<i64>>) -> Self {
+        let mut matrix = SparseMatrix::default();
+        for row in 0..rows.len() {
+            for col in 0..rows[row].len() {
+                if rows[row][col] > 0 {
+                    matrix.set(col, row, rows[row][col]);
+                }
+            }
+        }
+        matrix
+    }
+
+    fn set(&mut self, x : usize, y : usize, val : i64) {
+        *self.points.entry(Point{
+            x,
+            y,
+        }).or_insert(0) += val
+    }
+    fn get(&mut self, x : usize, y : usize) -> i64 {
+        match self.points.get(&Point{
+            x,
+            y,
+        }) {
+            Some(value) => *value,
+            None => 0,
+        }
+    }
+
+    fn increment(&mut self, x : usize, y : usize) {
+        *self.points.entry(Point {
+            x,
+            y,
+        }).or_insert(0) += 1
+    }
+
+    fn values(&self) -> std::collections::hash_map::Values<Point, i64> {
+        self.points.values()
+    }
+
+}
+
 #[derive(Debug, PartialEq, Default)]
 struct Intersections {
-    rows: Vec<Vec<i64>>,
+    matrix: SparseMatrix,
     include_diagnal : bool,
 }
 
@@ -169,51 +215,24 @@ impl Intersections {
     #[cfg(test)]
     fn new(rows: Vec<Vec<i64>>) -> Self {
         Intersections {
-            rows,
+            matrix: SparseMatrix::new(rows),
             include_diagnal: false,
         }
     }
     #[cfg(test)]
     fn new_with_diagnal(rows: Vec<Vec<i64>>) -> Self {
         Intersections {
-            rows,
+            matrix: SparseMatrix::new(rows),
             include_diagnal: true,
         }
     }
 
-    fn increment(&mut self, x : usize, y : usize) {
-        if self.rows.len() <= y {
-            for _row in 0..=(y - self.rows.len()) {
-                self.rows.push(vec![]);
-            }
-        }
-
-        for row in self.rows.iter_mut() {
-            if row.len() <= x {
-                for _col in 0..=(x - row.len()) {
-                    row.push(0);
-                }
-            }
-        }
-        self.rows[y][x] += 1;
-    }
-
     fn add(&mut self, segment : &LineSegment) {
         for point in segment.line(self.include_diagnal).iter() {
-            self.increment(point.x, point.y)
+            self.matrix.increment(point.x, point.y)
         }
     }
 
-    fn width(&self) -> usize {
-        if self.rows.len() > 0 {
-            self.rows[0].len()
-        } else {
-            0
-        }
-    }
-    fn height(&self) -> usize {
-        self.rows.len()
-    }
 }
 
 impl VentField {
@@ -229,11 +248,9 @@ impl VentField {
         let intersections = self.intersections(include_diagnal);
         let mut count = 0;
 
-        for row in intersections.rows.iter() {
-            for col in row.iter() {
-                if col >= &2 {
-                    count += 1;
-                }
+        for val in intersections.matrix.values() {
+            if val >= &2 {
+                count += 1;
             }
         }
 
@@ -256,7 +273,6 @@ impl VentField {
         for segment in self.lines.iter() {
             intersections.add(segment);
         }
-        println!("width={} height={}", intersections.width(), intersections.height());
         intersections
     }
 }
@@ -376,6 +392,31 @@ mod day5_test {
             ],
         });
         Ok(())
+    }
+
+    mod sparse_matrix {
+        use super::super::SparseMatrix;
+
+        #[test]
+        fn simple() {
+            let mut matrix = SparseMatrix::default();
+            matrix.set(1, 1, 3);
+            assert_eq!(matrix.get(1, 1), 3);
+        }
+
+        #[test]
+        fn simple_new_from_arrays() {
+            let matrix = SparseMatrix::new(vec![
+                vec![0, 3],
+                vec![7, 0],
+            ]);
+
+            let mut expected = SparseMatrix::default();
+            expected.set(1, 0, 3);
+            expected.set(0, 1, 7);
+
+            assert_eq!(matrix, expected);
+        }
     }
 
     mod part1 {
