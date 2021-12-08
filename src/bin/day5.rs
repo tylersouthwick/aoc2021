@@ -1,12 +1,19 @@
 use aoc2021::input::{InputFileError, InputFile, load_input};
 use std::str::FromStr;
+use std::cmp::{min, max};
 
 fn main() -> anyhow::Result<()> {
     let field : VentField = load_input(5)?;
 
-    println!("part1: {}", field.number_of_points_where_at_least_two_lines_overlap());
+    println!("part1: {}", field.part1());
 
     Ok(())
+}
+
+impl std::fmt::Display for Point {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{},{}", self.x, self.y)
+    }
 }
 
 impl FromStr for Point {
@@ -44,7 +51,7 @@ impl FromStr for LineSegment {
 
 impl std::fmt::Display for LineSegment {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{},{} -> {},{}", self.from.x, self.from.y, self.to.x, self.to.y)
+        write!(f, "{} -> {}", self.from, self.to)
     }
 }
 
@@ -58,7 +65,7 @@ impl TryFrom<InputFile> for VentField {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Copy, Clone, PartialOrd, Ord, Eq)]
 struct Point {
     x : usize,
     y : usize,
@@ -76,7 +83,77 @@ impl LineSegment {
     fn is_vertical(&self) -> bool {
         self.from.x == self.to.x
     }
+
+    fn line(&self, include_diagnal : bool) -> Vec<Point> {
+        let mut line = vec![];
+        if self.is_horizontal() {
+            for x in self.min().x..=self.max().x {
+                line.push(Point {
+                    x,
+                    y: self.from.y
+                });
+            }
+        } else if self.is_vertical() {
+            for y in self.min().y..=self.max().y {
+                line.push(Point {
+                    y,
+                    x: self.from.x,
+                });
+            }
+        } else if include_diagnal {
+            println!("from={} to={}", self.from, self.to);
+            let m = ((self.from.y as i64) - (self.to.y as i64)) / ((self.from.x as i64) - (self.to.x as i64));
+            let b = (self.from.y as i64) - m * (self.from.x as i64);
+            println!("m={} b={}", m, b);
+
+            for x in min(self.from.x, self.to.x)..=max(self.from.x, self.to.x) {
+                line.push(Point {
+                    x,
+                    y: ((m * (x as i64) + b) as usize),
+                })
+            }
+        }
+
+        line
+    }
+
+    fn min(&self) -> Point {
+        if self.is_horizontal() {
+            if self.from.x < self.to.x {
+                self.from
+            } else {
+                self.to
+            }
+        } else if self.is_vertical() {
+            if self.from.y < self.to.y {
+                self.from
+            } else {
+                self.to
+            }
+        } else {
+            self.from
+        }
+    }
+
+    fn max(&self) -> Point {
+        if self.is_horizontal() {
+            if self.from.x > self.to.x {
+                self.from
+            } else {
+                self.to
+            }
+        } else if self.is_vertical() {
+            if self.from.y > self.to.y {
+                self.from
+            } else {
+                self.to
+            }
+        } else {
+            self.from
+        }
+    }
 }
+
 #[derive(Debug, PartialEq)]
 struct VentField {
     lines : Vec<LineSegment>
@@ -85,15 +162,22 @@ struct VentField {
 #[derive(Debug, PartialEq, Default)]
 struct Intersections {
     rows: Vec<Vec<i64>>,
+    include_diagnal : bool,
 }
-
-use std::cmp::{min, max};
 
 impl Intersections {
     #[cfg(test)]
     fn new(rows: Vec<Vec<i64>>) -> Self {
         Intersections {
             rows,
+            include_diagnal: false,
+        }
+    }
+    #[cfg(test)]
+    fn new_with_diagnal(rows: Vec<Vec<i64>>) -> Self {
+        Intersections {
+            rows,
+            include_diagnal: true,
         }
     }
 
@@ -115,16 +199,8 @@ impl Intersections {
     }
 
     fn add(&mut self, segment : &LineSegment) {
-        if segment.is_horizontal() {
-            for x in min(segment.from.x, segment.to.x)..=max(segment.from.x, segment.to.x) {
-                self.increment(x, segment.from.y)
-            }
-        } else if segment.is_vertical() {
-            for y in min(segment.from.y, segment.to.y)..=max(segment.to.y, segment.from.y) {
-                self.increment(segment.from.x, y)
-            }
-        } else {
-            //ignore
+        for point in segment.line(self.include_diagnal).iter() {
+            self.increment(point.x, point.y)
         }
     }
 
@@ -141,11 +217,19 @@ impl Intersections {
 }
 
 impl VentField {
-    fn number_of_points_where_at_least_two_lines_overlap(&self) -> i64 {
-        let diagram = self.diagram();
+    fn part1(&self) -> i64 {
+        self.number_of_points_where_at_least_two_lines_overlap(false)
+    }
+
+    fn part2(&self) -> i64 {
+        self.number_of_points_where_at_least_two_lines_overlap(true)
+    }
+
+    fn number_of_points_where_at_least_two_lines_overlap(&self, include_diagnal : bool) -> i64 {
+        let intersections = self.intersections(include_diagnal);
         let mut count = 0;
 
-        for row in diagram.rows.iter() {
+        for row in intersections.rows.iter() {
             for col in row.iter() {
                 if col >= &2 {
                     count += 1;
@@ -156,8 +240,19 @@ impl VentField {
         count
     }
 
-    fn diagram(&self) -> Intersections {
-        let mut intersections = Intersections::default();
+    fn part2_intersections(&self) -> Intersections {
+        self.intersections(true)
+    }
+
+    fn part1_intersections(&self) -> Intersections {
+        self.intersections(false)
+    }
+
+    fn intersections(&self, include_diagnal: bool) -> Intersections {
+        let mut intersections = Intersections {
+            include_diagnal,
+            ..Intersections::default()
+        };
         for segment in self.lines.iter() {
             intersections.add(segment);
         }
@@ -167,23 +262,40 @@ impl VentField {
 }
 
 #[cfg(test)]
-mod test {
+mod day5_test {
     use super::*;
     use aoc2021::input::*;
 
-    #[test]
-    fn parse_point() -> anyhow::Result<()> {
-        let point : Point= FromStr::from_str("3,9")?;
-        assert_eq!(point, Point {
-            x: 3,
-            y: 9,
-        });
+    mod point {
+        use super::*;
+        use rstest::rstest;
 
-        Ok(())
+        #[rstest]
+        #[case("1,1", Point { x: 1, y: 1 })]
+        #[case("3,4", Point { x: 3, y: 4 })]
+        fn parse_point(#[case] p : &str, #[case] expected : Point) -> anyhow::Result<()> {
+            let point : Point= FromStr::from_str(p)?;
+            assert_eq!(point, expected);
+
+            Ok(())
+        }
     }
 
     mod line_segment {
         use super::*;
+        use rstest::rstest;
+
+        #[rstest]
+        #[case("1,1 -> 3,3", vec!["1,1", "2,2", "3,3"])]
+        #[case("9,7 -> 7,9", vec!["9,7", "8,8", "7,9"])]
+        fn generate_line(#[case] line_segment : &str, #[case] points : Vec<&str>) -> anyhow::Result<()> {
+            let parsed_segment : LineSegment = FromStr::from_str(line_segment)?;
+            let mut parsed_points : Vec<Point> = points.into_iter().map(FromStr::from_str).collect::<Result<Vec<Point>, _>>()?;
+
+            assert_eq!(parsed_segment.line(true).sort(), parsed_points.sort());
+
+            Ok(())
+        }
 
         #[test]
         fn is_horizontal() {
@@ -266,40 +378,85 @@ mod test {
         Ok(())
     }
 
-    #[test]
-    fn diagram() -> anyhow::Result<()> {
-        let expected = Intersections::new(vec![
-            vec![0,0,0,0,0,0,0,1,0,0],
-            vec![0,0,1,0,0,0,0,1,0,0],
-            vec![0,0,1,0,0,0,0,1,0,0],
-            vec![0,0,0,0,0,0,0,1,0,0],
-            vec![0,1,1,2,1,1,1,2,1,1],
-            vec![0,0,0,0,0,0,0,0,0,0],
-            vec![0,0,0,0,0,0,0,0,0,0],
-            vec![0,0,0,0,0,0,0,0,0,0],
-            vec![0,0,0,0,0,0,0,0,0,0],
-            vec![2,2,2,1,1,1,0,0,0,0],
-        ]);
+    mod part1 {
+        use super::*;
 
-        let field : VentField = load_sample(5)?;
-        assert_eq!(field.diagram(), expected);
+        #[test]
+        fn intersections() -> anyhow::Result<()> {
+            let expected = Intersections::new(vec![
+                vec![0,0,0,0,0,0,0,1,0,0],
+                vec![0,0,1,0,0,0,0,1,0,0],
+                vec![0,0,1,0,0,0,0,1,0,0],
+                vec![0,0,0,0,0,0,0,1,0,0],
+                vec![0,1,1,2,1,1,1,2,1,1],
+                vec![0,0,0,0,0,0,0,0,0,0],
+                vec![0,0,0,0,0,0,0,0,0,0],
+                vec![0,0,0,0,0,0,0,0,0,0],
+                vec![0,0,0,0,0,0,0,0,0,0],
+                vec![2,2,2,1,1,1,0,0,0,0],
+            ]);
 
-        Ok(())
+            let field : VentField = load_sample(5)?;
+            assert_eq!(field.part1_intersections(), expected);
+
+            Ok(())
+        }
+
+        #[test]
+        fn sample() -> anyhow::Result<()> {
+            let field : VentField = load_sample(5)?;
+            assert_eq!(field.part1(), 5);
+            Ok(())
+        }
+
+        #[test]
+        fn part1() -> anyhow::Result<()> {
+            let field : VentField = load_input(5)?;
+
+            assert_eq!(field.part1(), 6461);
+
+            Ok(())
+        }
     }
 
-    #[test]
-    fn number_of_points_where_at_least_two_lines_overlap() -> anyhow::Result<()> {
-        let field : VentField = load_sample(5)?;
-        assert_eq!(field.number_of_points_where_at_least_two_lines_overlap(), 5);
-        Ok(())
-    }
+    mod part2 {
+        use super::*;
 
-    #[test]
-    fn part1() -> anyhow::Result<()> {
-        let field : VentField = load_input(5)?;
+        #[test]
+        fn intersections() -> anyhow::Result<()> {
+            let expected = Intersections::new_with_diagnal(vec![
+                vec![1,0,1,0,0,0,0,1,1,0],
+                vec![0,1,1,1,0,0,0,2,0,0],
+                vec![0,0,2,0,1,0,1,1,1,0],
+                vec![0,0,0,1,0,2,0,2,0,0],
+                vec![0,1,1,2,3,1,3,2,1,1],
+                vec![0,0,0,1,0,2,0,0,0,0],
+                vec![0,0,1,0,0,0,1,0,0,0],
+                vec![0,1,0,0,0,0,0,1,0,0],
+                vec![1,0,0,0,0,0,0,0,1,0],
+                vec![2,2,2,1,1,1,0,0,0,0],
+            ]);
 
-        assert_eq!(field.number_of_points_where_at_least_two_lines_overlap(), 6461);
+            let field : VentField = load_sample(5)?;
+            assert_eq!(field.part2_intersections(), expected);
 
-        Ok(())
+            Ok(())
+        }
+
+        #[test]
+        fn sample() -> anyhow::Result<()> {
+            let field : VentField = load_sample(5)?;
+            assert_eq!(field.part2(), 12);
+            Ok(())
+        }
+
+        #[test]
+        fn part2() -> anyhow::Result<()> {
+            let field : VentField = load_input(5)?;
+
+            assert_eq!(field.part2(), 18065);
+
+            Ok(())
+        }
     }
 }
