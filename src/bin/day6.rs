@@ -5,7 +5,12 @@ fn main() -> anyhow::Result<()> {
     let mut part1 : SchoolOfFish = load_input(6)?;
     part1.spawn(80);
 
-    println!("part1: {}", part1.fish.len());
+    println!("part1: {}", part1.fish_count());
+
+    let mut part2 : SchoolOfFish = aoc2021::input::load_input(6)?;
+    part2.spawn(256);
+
+    println!("part2: {}", part2.fish_count());
 
     Ok(())
 }
@@ -16,11 +21,6 @@ struct Fish {
 }
 
 impl Fish {
-    fn new() -> Self {
-        Fish {
-            timer: 8,
-        }
-    }
 
     fn from(timer : usize) -> Self {
         Fish {
@@ -28,43 +28,73 @@ impl Fish {
         }
     }
 
-    fn tick(&mut self) -> Vec<Fish> {
-        if self.timer == 0 {
-            self.timer = 6;
-            vec![Fish::new()]
-        } else {
-            self.timer -= 1;
-            vec![]
-        }
-    }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Default)]
 struct SchoolOfFish {
-    fish : Vec<Fish>
+    fish_ages : std::collections::BTreeMap<usize, i64>
 }
 
-impl std::fmt::Display for SchoolOfFish{
+impl std::fmt::Display for SchoolOfFish {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let s : Vec<String> = self.fish.iter().map(|x| x.timer.to_string()).collect();
-        write!(f, "{}", s.join(","))
+        let mut ages = (0_usize..=8_usize).into_iter()
+            .map(|x| format!("{}={}", x, self.fish_ages.get(&x).unwrap_or(&0)))
+            .collect::<Vec<String>>();
+        ages.reverse();
+        write!(f, "{}", ages.join(","))
     }
 }
 
 impl SchoolOfFish {
+    fn new(fish : Vec<Fish>) -> Self {
+        let mut school = SchoolOfFish::default();
+
+        for f in fish.iter() {
+            school.add(f);
+        }
+
+        school
+    }
+
+    fn add_school(&mut self, school : &SchoolOfFish) {
+        for (age, count) in school.fish_ages.iter() {
+            *self.fish_ages.entry(*age).or_insert(0) += *count;
+        }
+    }
+
+    fn add(&mut self, fish : &Fish) {
+        *self.fish_ages.entry(fish.timer).or_insert(0) += 1;
+    }
+
+    fn spawn_day(&mut self) {
+        let mut new_fish = std::collections::BTreeMap::new();
+
+        for (age, count) in self.fish_ages.iter() {
+            if *age == 0 {
+                *new_fish.entry(6).or_insert(0) += *count;
+                *new_fish.entry(8).or_insert(0) += *count;
+            } else {
+                *new_fish.entry(*age - 1).or_insert(0) += *count;
+            }
+        }
+
+        self.fish_ages = new_fish;
+    }
+
+    fn fish_count(&self) -> i64 {
+        let mut total = 0;
+
+        for count in self.fish_ages.values() {
+            total += count
+        }
+
+        total
+    }
+
     fn spawn(&mut self, days : usize) {
-        for _day in 0..days {
-            let mut new_fish = vec![];
-
-            for fish in self.fish.iter_mut() {
-                for new in fish.tick().into_iter() {
-                    new_fish.push(new);
-                }
-            }
-
-            for fish in new_fish.into_iter() {
-                self.fish.push(fish);
-            }
+        for day in 0..days {
+            println!("day {} fish={}", day, self);
+            self.spawn_day();
         }
     }
 }
@@ -73,28 +103,28 @@ impl FromStr for SchoolOfFish {
     type Err = InputFileError;
 
     fn from_str(s : &str) -> Result<Self, Self::Err> {
-        Ok(SchoolOfFish {
-            fish: s.split(",")
+        Ok(SchoolOfFish::new(s.split(",")
                 .map(str::trim)
                 .filter(|x| !x.is_empty())
                 .map(|x| x.parse::<usize>())
                 .collect::<Result<Vec<usize>, _>>()?
                 .into_iter()
                 .map(Fish::from)
-                .collect(),
-        })
+                .collect()))
     }
 }
 impl TryFrom<InputFile> for SchoolOfFish {
     type Error = InputFileError;
 
     fn try_from(file : InputFile) -> Result<Self, Self::Error> {
-        let tokens : Vec<SchoolOfFish> = file.try_into()?;
-        Ok(SchoolOfFish {
-            fish: tokens.iter()
-                .flat_map(|x| x.fish.clone())
-                .collect(),
-        })
+        let schools : Vec<SchoolOfFish> = file.try_into()?;
+        let mut school = SchoolOfFish::default();
+
+        for s in schools.iter() {
+            school.add_school(s);
+        }
+
+        Ok(school)
     }
 }
 
@@ -105,33 +135,16 @@ mod day6_tests {
     use rstest::rstest;
 
     #[test]
-    fn tick() {
-        let mut fish = Fish::new();
-
-        assert_eq!(fish.tick().len(), 0);
-        assert_eq!(fish.tick().len(), 0);
-        assert_eq!(fish.tick().len(), 0);
-        assert_eq!(fish.tick().len(), 0);
-        assert_eq!(fish.tick().len(), 0);
-        assert_eq!(fish.tick().len(), 0);
-        assert_eq!(fish.tick().len(), 0);
-        assert_eq!(fish.tick().len(), 0);
-        assert_eq!(fish.tick().len(), 1);
-    }
-
-    #[test]
     fn sample() -> anyhow::Result<()> {
         let school : SchoolOfFish = load_sample(6)?;
 
-        assert_eq!(school, SchoolOfFish {
-            fish: vec![
+        assert_eq!(school, SchoolOfFish::new(vec![
                 Fish::from(3),
                 Fish::from(4),
                 Fish::from(3),
                 Fish::from(1),
                 Fish::from(2),
-            ],
-        });
+        ]));
 
         Ok(())
     }
@@ -140,11 +153,21 @@ mod day6_tests {
         use super::*;
 
         #[test]
-        fn results() -> anyhow::Result<()> {
+        fn part1() -> anyhow::Result<()> {
             let mut school : SchoolOfFish = load_sample(6)?;
             school.spawn(80);
 
-            assert_eq!(school.fish.len(), 5934);
+            assert_eq!(school.fish_count(), 5934);
+
+            Ok(())
+        }
+
+        #[test]
+        fn part2() -> anyhow::Result<()> {
+            let mut school : SchoolOfFish = load_sample(6)?;
+            school.spawn(256);
+
+            assert_eq!(school.fish_count(), 26984457539);
 
             Ok(())
         }
@@ -159,7 +182,22 @@ mod day6_tests {
             let mut school : SchoolOfFish = load_input(6)?;
             school.spawn(80);
 
-            assert_eq!(school.fish.len(), 355386);
+            assert_eq!(school.fish_count(), 355386);
+
+            Ok(())
+        }
+    }
+
+    mod part2 {
+        use super::*;
+        use aoc2021::input::load_input;
+
+        #[test]
+        fn results() -> anyhow::Result<()> {
+            let mut school : SchoolOfFish = load_input(6)?;
+            school.spawn(256);
+
+            assert_eq!(school.fish_count(), 1613415325809);
 
             Ok(())
         }
