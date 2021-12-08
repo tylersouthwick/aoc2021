@@ -29,6 +29,7 @@ impl InputFile {
             .map(str::to_string)
             .collect()
     }
+
 }
 
 impl<O : FromStr> TryFrom<InputFile> for Vec<O> where InputFileError : From<<O as FromStr>::Err> {
@@ -61,3 +62,4 @@ fn load_file<O : TryFrom<InputFile>>(file_name : String) -> Result<O, InputFileE
         None => Err(InputFileError::CouldNotFindDay(file_name))
     }
 }
+

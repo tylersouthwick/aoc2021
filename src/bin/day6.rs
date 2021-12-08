@@ -35,6 +35,21 @@ struct SchoolOfFish {
     fish_ages : std::collections::BTreeMap<usize, i64>
 }
 
+impl std::ops::Add for SchoolOfFish {
+
+    type Output = SchoolOfFish;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        let mut school = SchoolOfFish::default();
+
+        for (age, count) in rhs.fish_ages.iter() {
+            *school.fish_ages.entry(*age).or_insert(0) += *count;
+        }
+
+        school
+    }
+}
+
 impl std::fmt::Display for SchoolOfFish {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut ages = (0_usize..=8_usize).into_iter()
@@ -54,12 +69,6 @@ impl SchoolOfFish {
         }
 
         school
-    }
-
-    fn add_school(&mut self, school : &SchoolOfFish) {
-        for (age, count) in school.fish_ages.iter() {
-            *self.fish_ages.entry(*age).or_insert(0) += *count;
-        }
     }
 
     fn add(&mut self, fish : &Fish) {
@@ -118,13 +127,8 @@ impl TryFrom<InputFile> for SchoolOfFish {
 
     fn try_from(file : InputFile) -> Result<Self, Self::Error> {
         let schools : Vec<SchoolOfFish> = file.try_into()?;
-        let mut school = SchoolOfFish::default();
-
-        for s in schools.iter() {
-            school.add_school(s);
-        }
-
-        Ok(school)
+        Ok(schools.into_iter()
+            .fold(SchoolOfFish::default(), |a, b| a + b))
     }
 }
 
