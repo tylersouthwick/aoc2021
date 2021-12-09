@@ -37,10 +37,11 @@ impl InputFile {
         self.data.clone()
     }
 
-    pub fn with_delimeter(&self, d : String) -> InputFile {
+    pub fn with_delimeter<S : Into<String>>(&self, d : S) -> InputFile {
+        let s = d.into();
         InputFile {
             data: self.data.iter()
-                .flat_map(|x| x.split(&d)
+                .flat_map(|x| x.split(&s)
                     .map(str::trim)
                     .filter(|x| !x.is_empty())
                     .map(str::to_string)
