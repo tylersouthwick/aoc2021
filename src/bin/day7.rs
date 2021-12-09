@@ -3,7 +3,8 @@ use aoc2021::input::{InputFileError, InputFile, load_input};
 fn main() -> anyhow::Result<()> {
     let crabs : Crabs = load_input(7)?;
 
-    println!("part1: {:?}", crabs.optimized_horizontal_alignment());
+    println!("part1: {:?}", crabs.optimized_horizontal_alignment::<Part1FuelMultiplier>());
+    println!("part1: {:?}", crabs.optimized_horizontal_alignment::<Part2FuelMultiplier>());
 
     Ok(())
 }
@@ -11,6 +12,32 @@ fn main() -> anyhow::Result<()> {
 #[derive(Debug, PartialEq)]
 struct Crabs {
     crabs : Vec<Crab>,
+}
+
+trait FuelMultiplier {
+    fn fuel_multiplier(step : i64) -> i64;
+}
+
+struct Part1FuelMultiplier {
+}
+
+struct Part2FuelMultiplier {
+}
+
+impl FuelMultiplier for Part1FuelMultiplier {
+    fn fuel_multiplier(step : i64) -> i64 {
+        step
+    }
+}
+
+impl FuelMultiplier for Part2FuelMultiplier {
+    fn fuel_multiplier(step : i64) -> i64 {
+        let mut count = 0;
+        for x in 0..step {
+            count += x + 1;
+        }
+        count
+    }
 }
 
 impl Crabs {
@@ -34,20 +61,20 @@ impl Crabs {
         }
     }
 
-    fn calculate_fuel_to_move(&self, horizontal_position : i64) -> i64 {
+    fn calculate_fuel_to_move<M : FuelMultiplier>(&self, horizontal_position : i64) -> i64 {
         let mut fuel = 0;
 
         for crab in self.crabs.iter() {
-            fuel += (crab.horizontal_position - horizontal_position).abs();
+            fuel += <M as FuelMultiplier>::fuel_multiplier((crab.horizontal_position - horizontal_position).abs());
         }
 
         fuel
     }
 
-    fn optimized_horizontal_alignment(&self) -> Option<(i64, i64)> {
+    fn optimized_horizontal_alignment<M : FuelMultiplier>(&self) -> Option<(i64, i64)> {
         let mut map = std::collections::HashMap::new();
         for location in self.min()..self.max() {
-            let result = self.calculate_fuel_to_move(location);
+            let result = self.calculate_fuel_to_move::<M>(location);
             map.insert(location, result);
         }
 
@@ -119,16 +146,30 @@ mod day7_test {
     fn calculate_fuel_to_move(#[case] target : i64, #[case] fuel : i64) -> anyhow::Result<()> {
         let crabs : Crabs = load_sample(7)?;
 
-        assert_eq!(crabs.calculate_fuel_to_move(target), fuel);
+        assert_eq!(crabs.calculate_fuel_to_move::<Part1FuelMultiplier>(target), fuel);
 
         Ok(())
+    }
+
+    mod part2 {
+        use super::*;
+
+        #[rstest]
+        #[case(5, 168)]
+        fn calculate_fuel_to_move(#[case] target : i64, #[case] fuel : i64) -> anyhow::Result<()> {
+            let crabs : Crabs = load_sample(7)?;
+
+            assert_eq!(crabs.calculate_fuel_to_move::<Part2FuelMultiplier>(target), fuel);
+
+            Ok(())
+        }
     }
 
     #[test]
     fn optimized_horizontal_alignment() -> anyhow::Result<()> {
         let crabs : Crabs = load_sample(7)?;
 
-        assert_eq!(crabs.optimized_horizontal_alignment(), Some((2, 37)));
+        assert_eq!(crabs.optimized_horizontal_alignment::<Part1FuelMultiplier>(), Some((2, 37)));
 
         Ok(())
     }
@@ -137,7 +178,7 @@ mod day7_test {
     fn part1() -> anyhow::Result<()> {
         let crabs : Crabs = load_input(7)?;
 
-        assert_eq!(crabs.optimized_horizontal_alignment(), Some((325, 326132)));
+        assert_eq!(crabs.optimized_horizontal_alignment::<Part1FuelMultiplier>(), Some((325, 326132)));
         Ok(())
     }
 }
