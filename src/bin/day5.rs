@@ -1,6 +1,7 @@
 use aoc2021::input::{InputFileError, InputFile, load_input};
 use std::str::FromStr;
 use std::cmp::{min, max};
+use aoc2021::Point;
 
 fn main() -> anyhow::Result<()> {
     let field : VentField = load_input(5)?;
@@ -8,28 +9,6 @@ fn main() -> anyhow::Result<()> {
     println!("part1: {}", field.part1());
 
     Ok(())
-}
-
-impl std::fmt::Display for Point {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{},{}", self.x, self.y)
-    }
-}
-
-impl FromStr for Point {
-    type Err = InputFileError;
-    fn from_str(s : &str) -> Result<Self, Self::Err> {
-        let tokens : Vec<&str> = s.split(",").collect();
-
-        if tokens.len() == 2 {
-            Ok(Point {
-                x: tokens[0].parse()?,
-                y: tokens[1].parse()?,
-            })
-        } else {
-            Err(InputFileError::GeneralError(format!("unable to parse {}", s)))
-        }
-    }
 }
 
 impl FromStr for LineSegment {
@@ -65,11 +44,6 @@ impl TryFrom<InputFile> for VentField {
     }
 }
 
-#[derive(Debug, PartialEq, Copy, Clone, PartialOrd, Ord, Eq, Default, Hash)]
-struct Point {
-    x : usize,
-    y : usize,
-}
 #[derive(Debug, PartialEq)]
 struct LineSegment {
     from : Point,
